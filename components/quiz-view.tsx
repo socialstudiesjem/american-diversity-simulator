@@ -21,6 +21,7 @@ type Question = {
   options: string[]
   answer: string
   hint?: string
+  extraHint?: string
 }
 
 function shuffle<T>(arr: T[]): T[] {
@@ -77,6 +78,7 @@ function buildQuestions(): Question[] {
 
   // 3) 역사적 배경 단서로 나라 맞히기 (2문항)
   for (const country of pool.slice(4, 6)) {
+    const dom = dominantGroup(country)
     const distractors = sample(
       COUNTRIES.filter((c) => c.id !== country.id),
       3,
@@ -89,6 +91,7 @@ function buildQuestions(): Question[] {
       options: shuffle([country.name, ...distractors]),
       answer: country.name,
       hint: country.history[1] ?? country.history[0],
+      extraHint: `가장 비중이 큰 집단은 '${GROUPS[dom].label}'(${country.composition[dom]}%)이고, 총인구는 약 ${formatPopulation(country.population)}입니다.`,
     })
   }
 
@@ -116,6 +119,7 @@ export function QuizView() {
   const [picked, setPicked] = useState<string | null>(null)
   const [score, setScore] = useState(0)
   const [finished, setFinished] = useState(false)
+  const [hintShown, setHintShown] = useState(false)
 
   const q = questions[index]
   const isCorrect = picked === q?.answer
@@ -133,6 +137,7 @@ export function QuizView() {
     }
     setIndex((i) => i + 1)
     setPicked(null)
+    setHintShown(false)
   }
 
   function restart() {
@@ -205,15 +210,51 @@ export function QuizView() {
         </h2>
 
         {q.kind === "chart" && (
-          <div className="mt-4 flex justify-center">
+          <div className="mt-4 flex flex-col items-center gap-4">
             <DonutChart country={q.country} size={220} showCenter={false} />
+            <ul className="flex flex-wrap justify-center gap-x-4 gap-y-2">
+              {GROUP_ORDER.filter((g) => (q.country.composition[g] ?? 0) > 0).map((g) => (
+                <li key={g} className="flex items-center gap-1.5 text-sm">
+                  <span
+                    className="size-3 shrink-0 rounded-[3px]"
+                    style={{ backgroundColor: GROUPS[g].color }}
+                    aria-hidden
+                  />
+                  <span className="text-muted-foreground">{GROUPS[g].label}</span>
+                  <span className="font-semibold text-foreground">
+                    {q.country.composition[g]}%
+                  </span>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
 
         {q.kind === "history" && (
-          <blockquote className="mt-4 rounded-lg border-l-4 border-primary bg-secondary/40 p-4 text-pretty leading-relaxed text-foreground/85">
-            {q.hint}
-          </blockquote>
+          <>
+            <blockquote className="mt-4 rounded-lg border-l-4 border-primary bg-secondary/40 p-4 text-pretty leading-relaxed text-foreground/85">
+              {q.hint}
+            </blockquote>
+            {!picked && q.extraHint && (
+              <div className="mt-3">
+                {hintShown ? (
+                  <p className="flex gap-2 rounded-lg bg-accent/10 p-3 text-sm leading-relaxed text-foreground/80">
+                    <HelpCircle className="mt-0.5 size-4 shrink-0 text-accent" />
+                    {q.extraHint}
+                  </p>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setHintShown(true)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:border-accent/60 hover:text-foreground"
+                  >
+                    <HelpCircle className="size-4" />
+                    힌트 보기
+                  </button>
+                )}
+              </div>
+            )}
+          </>
         )}
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
